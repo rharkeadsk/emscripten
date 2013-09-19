@@ -2158,12 +2158,8 @@ LibraryManager.library = {
             }
 
             // Add sign if needed
-            if (flagAlwaysSigned) {
-              if (currArg < 0) {
-                prefix = '-' + prefix;
-              } else {
-                prefix = '+' + prefix;
-              }
+            if (flagAlwaysSigned && currArg >= 0) {
+              prefix = '+' + prefix;
             }
 
             // Add padding.
