@@ -1926,9 +1926,14 @@ LibraryManager.library = {
   // Performs printf-style formatting.
   //   format: A pointer to the format string.
   //   varargs: A pointer to the start of the arguments list.
+  //   formatWide: True if the format string is wide (wchar_t, 32-bit)
   // Returns the resulting string string as a character array.
-  _formatString__deps: ['strlen', '_reallyNegative'],
-  _formatString: function(format, varargs) {
+  _formatString__deps: ['strlen', '_wcslen', '_reallyNegative'],
+  _formatString: function(format, varargs, formatWide) {
+    var formatStride = 1;
+    if (formatWide) {
+      formatStride = 4;
+    }
     var textIndex = format;
     var argIndex = 0;
     function getNextArg(type) {
@@ -1961,13 +1966,35 @@ LibraryManager.library = {
       return ret;
     }
 
+    function getCurr() {
+      if (formatWide) {
+        return {{{ makeGetValue(0, 'textIndex', 'i32') }}};
+      } else {
+        return {{{ makeGetValue(0, 'textIndex', 'i8') }}};
+      }
+    }
+    function getNext() {
+      if (formatWide) {
+        return {{{ makeGetValue(0, 'textIndex+4', 'i32') }}};
+      } else {
+        return {{{ makeGetValue(0, 'textIndex+1', 'i8') }}};
+      }
+    }
+    function getNextNext() {
+      if (formatWide) {
+        return {{{ makeGetValue(0, 'textIndex+8', 'i32') }}};
+      } else {
+        return {{{ makeGetValue(0, 'textIndex+2', 'i8') }}};
+      }
+    }
+
     var ret = [];
     var curr, next, currArg;
     while(1) {
       var startTextIndex = textIndex;
-      curr = {{{ makeGetValue(0, 'textIndex', 'i8') }}};
+      curr = getCurr();
       if (curr === 0) break;
-      next = {{{ makeGetValue(0, 'textIndex+1', 'i8') }}};
+      next = getNext();
       if (curr == {{{ charCode('%') }}}) {
         // Handle flags.
         var flagAlwaysSigned = false;
@@ -1999,21 +2026,21 @@ LibraryManager.library = {
             default:
               break flagsLoop;
           }
-          textIndex++;
-          next = {{{ makeGetValue(0, 'textIndex+1', 'i8') }}};
+          textIndex += formatStride;
+          next = getNext();
         }
 
         // Handle width.
         var width = 0;
         if (next == {{{ charCode('*') }}}) {
           width = getNextArg('i32');
-          textIndex++;
-          next = {{{ makeGetValue(0, 'textIndex+1', 'i8') }}};
+          textIndex += formatStride;
+          next = getNext();
         } else {
           while (next >= {{{ charCode('0') }}} && next <= {{{ charCode('9') }}}) {
             width = width * 10 + (next - {{{ charCode('0') }}});
-            textIndex++;
-            next = {{{ makeGetValue(0, 'textIndex+1', 'i8') }}};
+            textIndex += formatStride;
+            next = getNext();
           }
         }
 
@@ -2022,21 +2049,21 @@ LibraryManager.library = {
         if (next == {{{ charCode('.') }}}) {
           var precision = 0;
           precisionSet = true;
-          textIndex++;
-          next = {{{ makeGetValue(0, 'textIndex+1', 'i8') }}};
+          textIndex += formatStride;
+          next = getNext();
           if (next == {{{ charCode('*') }}}) {
             precision = getNextArg('i32');
-            textIndex++;
+            textIndex += formatStride;
           } else {
             while(1) {
-              var precisionChr = {{{ makeGetValue(0, 'textIndex+1', 'i8') }}};
+              var precisionChr = getNext();
               if (precisionChr < {{{ charCode('0') }}} ||
                   precisionChr > {{{ charCode('9') }}}) break;
               precision = precision * 10 + (precisionChr - {{{ charCode('0') }}});
-              textIndex++;
+              textIndex += formatStride;
             }
           }
-          next = {{{ makeGetValue(0, 'textIndex+1', 'i8') }}};
+          next = getNext();
         } else {
           var precision = 6; // Standard default.
         }
@@ -2045,18 +2072,18 @@ LibraryManager.library = {
         var argSize;
         switch (String.fromCharCode(next)) {
           case 'h':
-            var nextNext = {{{ makeGetValue(0, 'textIndex+2', 'i8') }}};
+            var nextNext = getNextNext();
             if (nextNext == {{{ charCode('h') }}}) {
-              textIndex++;
+              textIndex += formatStride;
               argSize = 1; // char (actually i32 in varargs)
             } else {
               argSize = 2; // short (actually i32 in varargs)
             }
             break;
           case 'l':
-            var nextNext = {{{ makeGetValue(0, 'textIndex+2', 'i8') }}};
+            var nextNext = getNextNext();
             if (nextNext == {{{ charCode('l') }}}) {
-              textIndex++;
+              textIndex += formatStride;
               argSize = 8; // long long
             } else {
               argSize = 4; // long
@@ -2075,8 +2102,8 @@ LibraryManager.library = {
           default:
             argSize = null;
         }
-        if (argSize) textIndex++;
-        next = {{{ makeGetValue(0, 'textIndex+1', 'i8') }}};
+        if (argSize) textIndex += formatStride;
+        next = getNext();
 
         // Handle type specifier.
         switch (String.fromCharCode(next)) {
@@ -2291,8 +2318,15 @@ LibraryManager.library = {
           }
           case 's': {
             // String.
-            var arg = getNextArg('i8*');
-            var argLength = arg ? _strlen(arg) : '(null)'.length;
+            var arg;
+            var argLength;
+            if (argSize && argSize >= 4) {
+              arg = getNextArg('i32*');
+              argLength = arg ? __wcslen(arg) : '(null)'.length;
+            } else {
+              arg = getNextArg('i8*');
+              argLength = arg ? _strlen(arg) : '(null)'.length;
+            }
             if (precisionSet) argLength = Math.min(argLength, precision);
             if (!flagLeftAlign) {
               while (argLength < width--) {
@@ -2301,10 +2335,25 @@ LibraryManager.library = {
             }
             if (arg) {
               for (var i = 0; i < argLength; i++) {
-                ret.push({{{ makeGetValue('arg++', 0, 'i8', null, true) }}});
+                var chr;
+                if (argSize && argSize >= 4) {
+                  chr = {{{ makeGetValue('arg', 0, 'i32', null, true) }}};
+                  arg += 4;
+                  // NB: This is a hack, obviously this is not a valid way to convert between
+                  //     character sets. We're hoping that wide character support comes in
+                  //     upstream soon; if it doesn't, we should fix this.
+                  if (!formatWide && chr >= 256) {
+                    // NB: proper behavior would be to return -1 and set errno=EILSEQ.. but
+                    //     we don't have the plumbing for that right now, so hack away
+                    chr = 32;
+                  }
+                } else {
+                  chr = {{{ makeGetValue('arg++', 0, 'i8', null, true) }}};
+                }
+                ret.push(chr);
               }
             } else {
-              ret = ret.concat(intArrayFromString('(null)'.substr(0, argLength), true));
+              ret = ret.concat(intArrayFromString('(null)'.substr(0, argLength*4), true));
             }
             if (flagLeftAlign) {
               while (argLength < width--) {
@@ -2315,11 +2364,21 @@ LibraryManager.library = {
           }
           case 'c': {
             // Character.
-            if (flagLeftAlign) ret.push(getNextArg('i8'));
+            var chr;
+            if (argSize && argSize >= 4) {
+              chr = getNextArg('i32');
+              // NB: Hack, see above
+              if (!formatWide && chr >= 256) {
+                chr = 32;
+              }
+            } else {
+              chr = getNextArg('i8');
+            }
+            if (flagLeftAlign) ret.push(chr);
             while (--width > 0) {
               ret.push({{{ charCode(' ') }}});
             }
-            if (!flagLeftAlign) ret.push(getNextArg('i8'));
+            if (!flagLeftAlign) ret.push(chr);
             break;
           }
           case 'n': {
@@ -2340,12 +2399,12 @@ LibraryManager.library = {
             }
           }
         }
-        textIndex += 2;
+        textIndex += 2 * formatStride;
         // TODO: Support a/A (hex float) and m (last error) specifiers.
         // TODO: Support %1${specifier} for arg selection.
       } else {
         ret.push(curr);
-        textIndex += 1;
+        textIndex += formatStride;
       }
     }
     return ret;
@@ -2874,6 +2933,25 @@ LibraryManager.library = {
     if (limit < n || (n === undefined)) {{{ makeSetValue('s', 'i', '0', 'i8') }}};
     return result.length;
   },
+  swprintf__deps: ['_formatString'],
+  swprintf: function(ws, n, format, varargs) {
+    // int swprintf(wchar_t *restrict ws, size_t n, const wchar_t *restrict format, ...);
+    // http://pubs.opengroup.org/onlinepubs/000095399/functions/wprintf.html
+    var result = __formatString(format, varargs, true);
+    var limit = (n === undefined) ? result.length
+                                  : Math.min(result.length, Math.max(n - 1, 0));
+    if (ws < 0) {
+      ws = -ws;
+      var buf = _malloc((limit+1)*4);
+      {{{ makeSetValue('ws', '0', 'buf', 'i32*') }}};
+      ws = buf;
+    }
+    for (var i = 0; i < limit; i++) {
+      {{{ makeSetValue('ws', 'i*4', 'result[i]', 'i32') }}};
+    }
+    if (limit < n || (n === undefined)) {{{ makeSetValue('ws', 'i*4', '0', 'i32') }}};
+    return result.length;
+  },
   fprintf__deps: ['fwrite', '_formatString'],
   fprintf: function(stream, format, varargs) {
     // int fprintf(FILE *restrict stream, const char *restrict format, ...);
@@ -2908,6 +2986,7 @@ LibraryManager.library = {
   vsnprintf: 'snprintf',
   vprintf: 'printf',
   vsprintf: 'sprintf',
+  vswprintf: 'swprintf',
   vasprintf: 'asprintf',
   vscanf: 'scanf',
   vfscanf: 'fscanf',
@@ -2931,6 +3010,10 @@ LibraryManager.library = {
   vsprintf__deps: ['sprintf'],
   vsprintf: function(s, format, va_arg) {
     return _sprintf(s, format, {{{ makeGetValue('va_arg', 0, '*') }}});
+  },
+  vswprintf__deps: ['swprintf'],
+  vswprintf: function(s, format, va_arg) {
+    return _swprintf(s, format, {{{ makeGetValue('va_arg', 0, '*') }}});
   },
   vasprintf__deps: ['asprintf'],
   vasprintf: function(s, format, va_arg) {
@@ -3678,6 +3761,20 @@ LibraryManager.library = {
       curr = (curr + 1)|0;
     }
     return (curr - ptr)|0;
+  },
+
+  // NB: This is a hack so that formatString can use wcslen.
+  //     The real wcslen is in libc.
+  _wcslen__sig: 'ii',
+  _wcslen__asm: true,
+  _wcslen: function(ptr) {
+    ptr = ptr|0;
+    var curr = 0;
+    curr = ptr;
+    while ({{{ makeGetValueAsm('curr', '0', 'i32') }}}) {
+      curr = (curr + 4)|0;
+    }
+    return (((curr - ptr)|0) / 4)|0;
   },
 
   strspn: function(pstr, pset) {
@@ -8868,7 +8965,7 @@ function autoAddDeps(object, name) {
 }
 
 // Add aborting stubs for various libc stuff needed by libc++
-['pthread_cond_signal', 'pthread_equal', 'wcstol', 'wcstoll', 'wcstoul', 'wcstoull', 'wcstof', 'wcstod', 'wcstold', 'swprintf', 'pthread_join', 'pthread_detach', 'strcoll_l', 'strxfrm_l', 'wcscoll_l', 'toupper_l', 'tolower_l', 'iswspace_l', 'iswprint_l', 'iswcntrl_l', 'iswupper_l', 'iswlower_l', 'iswalpha_l', 'iswdigit_l', 'iswpunct_l', 'iswxdigit_l', 'iswblank_l', 'wcsxfrm_l', 'towupper_l', 'towlower_l', 'catgets', 'catopen', 'catclose'].forEach(function(aborter) {
+['pthread_cond_signal', 'pthread_equal', 'wcstol', 'wcstoll', 'wcstoul', 'wcstoull', 'wcstof', 'wcstod', 'wcstold', 'pthread_join', 'pthread_detach', 'strcoll_l', 'strxfrm_l', 'wcscoll_l', 'toupper_l', 'tolower_l', 'iswspace_l', 'iswprint_l', 'iswcntrl_l', 'iswupper_l', 'iswlower_l', 'iswalpha_l', 'iswdigit_l', 'iswpunct_l', 'iswxdigit_l', 'iswblank_l', 'wcsxfrm_l', 'towupper_l', 'towlower_l', 'catgets', 'catopen', 'catclose'].forEach(function(aborter) {
   LibraryManager.library[aborter] = function() { throw 'TODO: ' + aborter };
 });
 

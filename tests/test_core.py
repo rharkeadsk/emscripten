@@ -6718,6 +6718,12 @@ at function.:blag
       '''
     self.do_run(src, '22 : me and myself 25 1.34\n21 waka 95\n')
 
+  def test_wprintf(self):
+    if self.emcc_args is None: return self.skip('needs emcc for wprintf')
+    src = open(path_from_root('tests', 'wprintf', 'test_wprintf.c'), 'r').read()
+    expected = open(path_from_root('tests', 'wprintf', 'output.txt'), 'r').read()
+    self.do_run(src, expected, force_c=True)
+
   def test_perrar(self):
     src = r'''
       #include <sys/types.h>
