@@ -211,12 +211,12 @@ function module(ignore, func) {
         */
     };
 
-//    var assert = {
+    var assert = {
 
         ////////////////////////////////////////////////////////////////////////////////
         // GENERAL STATUS
 
-        assert.fail = function(info) {
+        fail: function(info) {
             info = info || "assert.fail()";
             fail(new AssertionError(info));
         },
@@ -224,14 +224,14 @@ function module(ignore, func) {
         ////////////////////////////////////////////////////////////////////////////////
         // BOOLEAN TESTS
 
-        assert['true'] = function(value) {
+        'true': function(value) {
             if (!value) {
                 fail(new AssertionError("expected truthy, actual " + formatTestValue(value)),
                      {Value: value});
             }
         },
 
-        assert['false'] = function(value) {
+        'false': function(value) {
             if (value) {
                 fail(new AssertionError("expected falsy, actual " + formatTestValue(value)),
                      {Value: value});
@@ -241,38 +241,38 @@ function module(ignore, func) {
         ////////////////////////////////////////////////////////////////////////////////
         // SCALAR COMPARISON
 
-        assert.equal = function(expected, actual) {
+        equal: function(expected, actual) {
             if (expected !== actual) {
                 fail(new AssertionError('expected: ' + formatTestValue(expected) + ', actual: ' + formatTestValue(actual)),
                      {Expected: expected, Actual: actual});
             }
         },
 
-        assert.notEqual = function(expected, actual) {
+        notEqual: function(expected, actual) {
             if (expected === actual) {
                 fail(new AssertionError('actual was equal to: ' + formatTestValue(expected)));
             }
         },
 
-        assert.greater = function(lhs, rhs) {
+        greater: function(lhs, rhs) {
             if (lhs <= rhs) {
                 fail(new AssertionError(formatTestValue(lhs) + ' not greater than ' + formatTestValue(rhs)));
             }
         },
 
-        assert.less = function(lhs, rhs) {
+        less: function(lhs, rhs) {
             if (lhs >= rhs) {
                 fail(new AssertionError(formatTestValue(lhs) + ' not less than ' + formatTestValue(rhs)));
             }
         },
 
-        assert.greaterOrEqual = function(lhs, rhs) {
+        greaterOrEqual: function(lhs, rhs) {
             if (lhs < rhs) {
                 fail(new AssertionError(formatTestValue(lhs) + ' not greater than or equal to ' + formatTestValue(rhs)));
             }
         },
 
-        assert.lessOrEqual = function(lhs, rhs) {
+        lessOrEqual: function(lhs, rhs) {
             if (lhs > rhs) {
                 fail(new AssertionError(formatTestValue(lhs) + ' not less than or equal to ' + formatTestValue(rhs)));
             }
@@ -281,14 +281,14 @@ function module(ignore, func) {
         ////////////////////////////////////////////////////////////////////////////////
         // DEEP COMPARISON
 
-        assert.deepEqual = function(expected, actual) {
+        deepEqual: function(expected, actual) {
             if (!_.isEqual(expected, actual)) {
                 fail(new AssertionError('expected: ' + formatTestValue(expected) + ', actual: ' + formatTestValue(actual)),
                      {Expected: expected, Actual: actual});
             }
         },
 
-        assert.notDeepEqual = function(expected, actual) {
+        notDeepEqual: function(expected, actual) {
             if (_.isEqual(expected, actual)) {
                 fail(new AssertionError('expected: ' + formatTestValue(expected) + ' and actual: ' + formatTestValue(actual) + ' were equal'));
             }
@@ -297,7 +297,7 @@ function module(ignore, func) {
         ////////////////////////////////////////////////////////////////////////////////
         // FLOATING POINT
 
-        assert.nearEqual = function( expected, actual, tolerance ) {
+        nearEqual: function( expected, actual, tolerance ) {
             if( tolerance === undefined ) {
                 tolerance = 0.0;
             }
@@ -318,21 +318,21 @@ function module(ignore, func) {
         ////////////////////////////////////////////////////////////////////////////////
         // STRING
 
-        assert.inString = function(expected, string){
+        inString: function(expected, string){
             if (-1 === string.indexOf(expected)){
                 fail(new AssertionError('expected: ' + formatTestValue(expected) + ' not in string: ' + formatTestValue(string)),
                      {Expected: expected, 'String': string});
             }
         },
 
-        assert.notInString = function(expected, string){
+        notInString: function(expected, string){
             if (-1 !== string.indexOf(expected)){
                 fail(new AssertionError('unexpected: ' + formatTestValue(expected) + ' in string: ' + formatTestValue(string)),
                      {Expected: expected, 'String': string});
             }
         },
 
-        assert.matches = function(re, string) {
+        matches: function(re, string) {
             if (!re.test(string)) {
                 fail(new AssertionError('regexp ' + re + ' does not match: ' + string));
             }
@@ -341,7 +341,7 @@ function module(ignore, func) {
         ////////////////////////////////////////////////////////////////////////////////
         // ARRAY
 
-        assert.inArray = function(expected, array) {
+        inArray: function(expected, array) {
             var found = false;
             _.each(array, function(element){
                 if (_.isEqual(expected, element)){
@@ -354,7 +354,7 @@ function module(ignore, func) {
             }
         },
 
-        assert.notInArray = function(expected, array) {
+        notInArray: function(expected, array) {
             var found = false;
             _.each(array, function(element){
                 if (_.isEqual(expected, element)){
@@ -370,13 +370,13 @@ function module(ignore, func) {
         ////////////////////////////////////////////////////////////////////////////////
         // OBJECTS
 
-        assert.hasKey = function (key, object) {
+        hasKey: function (key, object) {
             if (!(key in object)) {
                 fail(new AssertionError('Key ' + formatTestValue(key) + ' is not in object: ' + formatTestValue(object)));
             }
         },
 
-        assert.notHasKey = function (key, object) {
+        notHasKey: function (key, object) {
             if (key in object) {
                 fail(new AssertionError('Unexpected key ' + formatTestValue(key) + ' is found in object: ' + formatTestValue(object)));
             }
@@ -385,7 +385,7 @@ function module(ignore, func) {
         ////////////////////////////////////////////////////////////////////////////////
         // EXCEPTIONS
 
-        assert.throws = function(exception, fn) {
+        throws: function(exception, fn) {
             try {
                 fn();
             } catch (e) {
@@ -401,7 +401,7 @@ function module(ignore, func) {
         ////////////////////////////////////////////////////////////////////////////////
         // TYPE
 
-        assert['instanceof'] = function(actual, type) {
+        'instanceof': function(actual, type) {
             if(!(actual instanceof type)) {
                 fail(new AssertionError(formatTestValue(actual) + ' not instance of ' + formatTestValue(type)),
                     {Type: type, Actual: actual});
@@ -412,7 +412,7 @@ function module(ignore, func) {
         // DOM ASSERTIONS
 
         // TODO: lift into separate file?
-        assert.dom = {
+        dom: {
             present: function(domElement){
                 if (!$(domElement).length) {
                     fail(new AssertionError(decipherDomElement(domElement) + ' should be present'));
@@ -539,8 +539,8 @@ function module(ignore, func) {
                     fail(new AssertionError(decipherDomElement(el) + ' expected NOT to be empty'));
                 }
             }
-        };
-//    };
+        }
+    };
 
     function decipherDomElement(selectorOrJQueryObject) {
         if (typeof selectorOrJQueryObject === 'string') {

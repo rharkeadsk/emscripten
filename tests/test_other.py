@@ -2045,14 +2045,24 @@ int f() {
       (['--bind'], False),
       (['--bind', '-O1'], False),
       (['--bind', '-O2'], False),
+      (['--bind', '-O2', '--closure', '1'], False),
     ]:
       print args, fail
       self.clear()
       try_delete(self.in_dir('a.out.js'))
-      Popen([PYTHON, EMCC, path_from_root('tests', 'embind', 'embind_test.cpp'), '--post-js', path_from_root('tests', 'embind', 'underscore-1.4.2.js'), '--post-js', path_from_root('tests', 'embind', 'imvu_test_adapter.js'), '--post-js', path_from_root('tests', 'embind', 'embind.test.js')] + args, stderr=PIPE if fail else None).communicate()
+      Popen([PYTHON, EMCC, path_from_root('tests', 'embind', 'embind_test.cpp')] + args, stderr=PIPE if fail else None).communicate()
       assert os.path.exists(self.in_dir('a.out.js')) == (not fail)
       if not fail:
-        output = run_js(self.in_dir('a.out.js'), stdout=PIPE, stderr=PIPE, full_output=True, assert_returncode=0)
+        with open(self.in_dir('concat.js'), 'w') as outfile:
+          outfile.write('var Module=(function(){') # wrap output in function closure to prevent name leakage
+          with open(self.in_dir('a.out.js'), 'r') as infile:
+            outfile.write(infile.read())
+          outfile.write('\nreturn module["exports"];})();\n')
+          for filename in ['underscore-1.4.2.js', 'imvu_test_adapter.js', 'embind.test.js']:
+            with open(path_from_root('tests', 'embind', filename), 'r') as infile:
+              outfile.write(infile.read())
+              outfile.write('\n')
+        output = run_js(self.in_dir('concat.js'), stdout=PIPE, stderr=PIPE, full_output=True, assert_returncode=0)
         assert "FAIL" not in output, output
 
   def test_llvm_nativizer(self):
